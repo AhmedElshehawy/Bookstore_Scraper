@@ -42,7 +42,7 @@ class BookScraper:
             price = Decimal(self._extract_numbers(book_page.select_one('.price_color').text.strip())[0])
             rating = book_page.select_one('p.star-rating').attrs['class'][1]
             rating = w2n.word_to_num(rating)
-            description = soup.select_one('#product_description ~ p').text.strip()
+            description = (soup.select_one('#product_description ~ p') or '').get_text(strip=True)
             category = soup.select('.breadcrumb li')[2].text.strip()
             image_url = urljoin(self.base_url, soup.select_one('.item.active img')['src'])
             upc = soup.select_one("td").text.strip()
