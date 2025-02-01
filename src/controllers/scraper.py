@@ -80,7 +80,7 @@ class BookScraper:
                 if not book_containers:
                     break
                 for book_container in book_containers:
-                    book_url = urljoin(self.base_url, book_container.select_one('h3 a')['href'])
+                    book_url = f"{self.base_url}/catalogue/{book_container.select_one('h3 a')['href']}"
                     yield book_url
                 page_number += 1
             except requests.exceptions.RequestException as e:
