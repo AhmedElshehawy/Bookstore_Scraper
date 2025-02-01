@@ -87,6 +87,6 @@ class BookScraper:
                 logger.error(f"Error fetching page {page_url}: {e}")
                 break
     
-    def _extract_numbers(s: str) -> list[str]:
+    def _extract_numbers(self,s: str) -> list[str]:
         return re.findall(r"\d+\.\d+|\d+", s)  # Finds decimal numbers first, then integers
 
