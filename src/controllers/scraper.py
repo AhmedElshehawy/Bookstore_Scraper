@@ -18,11 +18,12 @@ class BookScraper:
         Get the soup object from the url
         """
         try:
+            logger.debug(f"Fetching URL: {url}")
             response = requests.get(url)
             response.raise_for_status()
             return BeautifulSoup(response.text, 'html.parser')
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error fetching URL: {e}")
+            logger.error(f"Error fetching URL {url}: {e}", exc_info=True)
             raise e
         
     def extract_one_book_info(self, book_url: str) -> dict:
@@ -30,9 +31,11 @@ class BookScraper:
         Extract the book info from the book url
         """
         try:
+            logger.info(f"Extracting book information from: {book_url}")
             soup = self.get_soup(book_url)
             book_page = soup.select_one('.product_main')
             if not book_page:
+                logger.error(f"Book page structure not found at {book_url}")
                 raise ValueError("Book page not found")
             
             title = book_page.select_one('h1').text.strip()
@@ -62,9 +65,10 @@ class BookScraper:
                 'image_url': image_url,
                 'book_url': book_url
             }
+            logger.debug(f"Successfully extracted book info: {title}")
             return book_info
         except (KeyError, AttributeError) as e:
-            logger.error(f"Error extracting book info from {book_url}: {e}")
+            logger.error(f"Error extracting book info from {book_url}: {e}", exc_info=True)
             raise e
     
     def get_all_book_urls(self) -> Generator[str, None, None]:
@@ -75,16 +79,19 @@ class BookScraper:
         while True:
             page_url = f"{self.base_url}catalogue/page-{page_number}.html"
             try:
+                logger.info(f"Fetching book list from page {page_number}")
                 soup = self.get_soup(page_url)
                 book_containers = soup.select('.product_pod')
                 if not book_containers:
+                    logger.info("No more books found. Stopping pagination.")
                     break
                 for book_container in book_containers:
                     book_url = f"{self.base_url}/catalogue/{book_container.select_one('h3 a')['href']}"
+                    logger.debug(f"Found book URL: {book_url}")
                     yield book_url
                 page_number += 1
             except requests.exceptions.RequestException as e:
-                logger.error(f"Error fetching page {page_url}: {e}")
+                logger.error(f"Error fetching page {page_url}: {e}", exc_info=True)
                 break
     
     def _extract_numbers(self,s: str) -> list[str]:
