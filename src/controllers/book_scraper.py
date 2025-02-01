@@ -3,7 +3,9 @@ import logging
 import re
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+from pydantic import HttpUrl
 from word2number import w2n
+from models import Book
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +71,7 @@ class BookScraper:
                     rating = book_page.select_one('p.star-rating')['class'][1]
                     rating = w2n.word_to_num(rating)
                     category = soup.select('.breadcrumb li')[2].text.strip()
-                    image_url = urljoin(self.base_url, soup.select_one('.item.active img')['src'])
+                    image_url = HttpUrl(urljoin(self.base_url, soup.select_one('.item.active img')['src']))
                     upc = soup.select_one("td").text.strip()
                     
                     # Extract availability and stock
@@ -83,17 +85,17 @@ class BookScraper:
                     if product_description:
                         description = product_description.find_next_sibling('p').text.strip()
                     
-                    book_info = { ## TODO: use Pydantic later on
-                        'title': title,
-                        'price': price,
-                        'rating': rating,
-                        'description': description,
-                        'category': category,
-                        'upc': upc,
-                        'num_available_units': stock,
-                        'image_url': image_url,
-                        'book_url': book_url
-                    }
+                    book_info = Book(
+                        title=title,
+                        price=price,
+                        rating=rating,
+                        description=description,
+                        category=category,
+                        upc=upc,
+                        num_available_units=stock,
+                        image_url=image_url,
+                        book_url=HttpUrl(book_url)
+                    )
                     return book_info
                     
                 except (AttributeError, IndexError, ValueError) as e:

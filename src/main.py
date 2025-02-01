@@ -19,7 +19,7 @@ base_url = "https://books.toscrape.com/"
 async def process_book(session, book_url, scraper):
     try:
         book_info = await scraper.extract_one_book_info(session, book_url)
-        logger.info(f"Processed book {book_url}: {book_info['title']}\n--------------------------------")
+        logger.info(f"Processed book {book_url}: {book_info.title}")
         return book_info, None
     except Exception as e:
         logger.error(f"Failed to process book {book_url}: {e}")
@@ -52,6 +52,5 @@ async def main():
         logger.info(f"Processing completed. Processed {processed_books} books, {len(failed_books)} failed.")
         logger.info(f"Failed books: {failed_books}")
         logger.info(f"Total time taken: {end_time - start_time:.2f} seconds")
-
 if __name__ == "__main__":
     asyncio.run(main())
