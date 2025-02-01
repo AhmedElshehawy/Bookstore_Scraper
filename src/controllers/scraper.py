@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class BookScraper:
     def __init__(self, base_url: str):
-        self.base_url = base_url
+        self.base_url = base_url[:-1] if base_url.endswith('/') else base_url
 
     def get_soup(self, url: str) -> BeautifulSoup:
         """
@@ -77,7 +77,7 @@ class BookScraper:
         """
         page_number = 1
         while True:
-            page_url = f"{self.base_url}catalogue/page-{page_number}.html"
+            page_url = f"{self.base_url}/catalogue/page-{page_number}.html"
             try:
                 logger.info(f"Fetching book list from page {page_number}")
                 soup = self.get_soup(page_url)
