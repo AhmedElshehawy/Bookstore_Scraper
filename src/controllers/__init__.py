@@ -1,1 +1,1 @@
-from .scraper import BookScraper
+from .book_scraper import BookScraper
