@@ -36,7 +36,7 @@ class BookScraper:
                 raise ValueError("Book page not found")
             
             title = book_page.select_one('h1').text.strip()
-            price = Decimal(book_page.select_one('.price_color').text.strip()[1:])
+            price = Decimal(self._extract_numbers(book_page.select_one('.price_color').text.strip())[0])
             rating = book_page.select_one('p.star-rating').attrs['class'][1]
             rating = w2n.word_to_num(rating)
             description = soup.select_one('#product_description ~ p').text.strip()
@@ -45,9 +45,9 @@ class BookScraper:
             upc = soup.select_one("td").text.strip()
 
             availability = book_page.select_one('.availability').text.strip()
-            match = re.search(r'\((\d+) available\)', availability)
-            if match:
-                stock = int(match.group(1))
+            untis_number = self._extract_numbers(availability)[0]
+            if untis_number:
+                stock = int(untis_number)
             else:
                 stock = 0
             
@@ -86,3 +86,7 @@ class BookScraper:
             except requests.exceptions.RequestException as e:
                 logger.error(f"Error fetching page {page_url}: {e}")
                 break
+    
+    def _extract_numbers(s: str) -> list[str]:
+        return re.findall(r"\d+\.\d+|\d+", s)  # Finds decimal numbers first, then integers
+
