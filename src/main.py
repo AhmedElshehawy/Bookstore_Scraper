@@ -4,6 +4,8 @@ import asyncio
 import aiohttp
 from controllers import BookScraper
 import time
+from models import DatabaseHandler
+
 
 start_time = time.time()
 
@@ -41,10 +43,12 @@ async def main():
         # Process results
         processed_books = 0
         failed_books = []
+        scraped_books = []
         
         for result, failed_url in results:
             if result:
                 processed_books += 1
+                scraped_books.append(result)
             if failed_url:
                 failed_books.append(failed_url)
         
@@ -52,5 +56,42 @@ async def main():
         logger.info(f"Processing completed. Processed {processed_books} books, {len(failed_books)} failed.")
         logger.info(f"Failed books: {failed_books}")
         logger.info(f"Total time taken: {end_time - start_time:.2f} seconds")
+        logger.info(f"Number of processed books: {processed_books}")
+        logger.info(f"Number of failed books: {len(failed_books)}")
+        logger.info(f"List of failed books: {failed_books}")
+        print(len(results))
+        print(results[0])
+        
+    # Save the results to a Database
+    start_time = time.time()
+    db_handler = DatabaseHandler()
+    db_status = {
+        'processed': 0,
+        'errors': [],
+        'success': True
+    }
+    try:
+        db_handler.connect()
+        
+        # Assuming event contains a list of books in dict format
+        for book in scraped_books:
+            try:
+                db_handler.process_book(book)
+                db_status['processed'] += 1
+                
+            except Exception as e:
+                db_status['errors'].append({
+                    'book_url': book.get('book_url'),
+                    'error': str(e)
+                })
+        end_time = time.time()
+        logger.info(f"Database processing completed. Processed {db_status['processed']} books, {len(db_status['errors'])} failed.")
+        logger.info(f"Failed books: {db_status['errors']}")
+        logger.info(f"Total time taken: {end_time - start_time:.2f} seconds")
+    except Exception as e:
+        db_status['success'] = False
+        db_status['errors'].append({'error': str(e)})
+    finally:
+        db_handler.close()
 if __name__ == "__main__":
     asyncio.run(main())
