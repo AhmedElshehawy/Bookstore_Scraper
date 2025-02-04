@@ -2,9 +2,9 @@ import json
 import logging
 import asyncio
 import aiohttp
-from controllers import BookScraper
+from book_scraper import BookScraper
 import time
-from models import DatabaseHandler
+from database_model import DatabaseHandler
 
 
 start_time = time.time()

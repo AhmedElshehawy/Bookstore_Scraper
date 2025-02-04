@@ -4,7 +4,7 @@ from psycopg2.extras import DictCursor
 from decimal import Decimal
 from typing import Dict, List, Optional
 from datetime import datetime
-from models import Book
+from book_model import Book
 
 class DatabaseHandler:
     """
