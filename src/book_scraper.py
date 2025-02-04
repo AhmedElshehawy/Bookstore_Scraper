@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from pydantic import HttpUrl
 from word2number import w2n
-from models import Book
+from book_model import Book
 
 logger = logging.getLogger(__name__)
 
