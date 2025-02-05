@@ -22,5 +22,10 @@ class Book(BaseModel):
         """Ensure price has at most 2 decimal places."""
         return Decimal(str(v)).quantize(Decimal('0.01'))
     
-    class Config:
-        json_encoders = {Decimal: lambda v: str(v)}
+    model_config = {
+        "json_encoders": {
+            Decimal: lambda d: str(d),
+            HttpUrl: lambda url: str(url),
+        },
+        "arbitrary_types_allowed": True,
+    }

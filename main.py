@@ -29,18 +29,18 @@ async def process_book(session: aiohttp.ClientSession, book_url: str, scraper: B
         logger.error(f"Failed to process book {book_url}: {e}")
         return None, book_url
 
-async def upsert_book(session: aiohttp.ClientSession, book: Dict) -> Dict[str, Any]:
+async def upsert_book(session: aiohttp.ClientSession, book: Book) -> Dict[str, Any]:
     """Upsert a single book to database."""
     try:
-        book_model = Book(**book)
-        async with session.post(DB_URL_UPSERT, json=book_model.model_dump()) as response:
+        book_info = json.loads(book.model_dump_json())
+        async with session.post(DB_URL_UPSERT, json=book_info) as response:
             if response.status != 200:
                 raise Exception(f"Failed to upsert book: {await response.text()}")
             return {'processed': 1, 'error': None}
     except Exception as e:
         return {
             'processed': 0,
-            'error': {'book_url': book.get('book_url'), 'error': str(e)}
+            'error': {'book_url': book_info.get('book_url'), 'error': str(e)}
         }
 
 async def process_books_batch(session: aiohttp.ClientSession, book_urls: List[str], scraper: BookScraper) -> Tuple[List, List]:
