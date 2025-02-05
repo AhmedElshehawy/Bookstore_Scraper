@@ -16,10 +16,11 @@ logger = logging.getLogger(__name__)
 
 # Constants
 BASE_URL = os.getenv("BASE_URL")
-DB_URL_UPSERT = os.getenv("DB_URL_UPSERT")
-CONCURRENT_DB_OPS = int(os.getenv("CONCURRENT_DB_OPS", "10"))
+DB_URL_UPSERT_BATCH = os.getenv("DB_URL_UPSERT_BATCH")
+CONCURRENT_DB_OPS = int(os.getenv("CONCURRENT_DB_OPS", "5"))
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", "25"))
 
-async def process_book(session: aiohttp.ClientSession, book_url: str, scraper: BookScraper) -> Tuple[Dict, str]:
+async def process_book(session: aiohttp.ClientSession, book_url: str, scraper: BookScraper) -> Tuple[Book, str]:
     """Process a single book URL and return the book info or error."""
     try:
         book_info = await scraper.extract_one_book_info(session, book_url)
@@ -29,21 +30,7 @@ async def process_book(session: aiohttp.ClientSession, book_url: str, scraper: B
         logger.error(f"Failed to process book {book_url}: {e}")
         return None, book_url
 
-async def upsert_book(session: aiohttp.ClientSession, book: Book) -> Dict[str, Any]:
-    """Upsert a single book to database."""
-    try:
-        book_info = json.loads(book.model_dump_json())
-        async with session.post(DB_URL_UPSERT, json=book_info) as response:
-            if response.status != 200:
-                raise Exception(f"Failed to upsert book: {await response.text()}")
-            return {'processed': 1, 'error': None}
-    except Exception as e:
-        return {
-            'processed': 0,
-            'error': {'book_url': book_info.get('book_url'), 'error': str(e)}
-        }
-
-async def process_books_batch(session: aiohttp.ClientSession, book_urls: List[str], scraper: BookScraper) -> Tuple[List, List]:
+async def process_books_batch(session: aiohttp.ClientSession, book_urls: List[str], scraper: BookScraper) -> Tuple[List[Book], List[str]]:
     """Process a batch of book URLs concurrently."""
     tasks = [process_book(session, url, scraper) for url in book_urls]
     results = await asyncio.gather(*tasks)
@@ -59,25 +46,45 @@ async def process_books_batch(session: aiohttp.ClientSession, book_urls: List[st
             
     return successful_books, failed_urls
 
-async def upsert_books_concurrent(session: aiohttp.ClientSession, books: List[Dict]) -> Dict[str, Any]:
-    """Upsert books concurrently with rate limiting."""
+async def upsert_books_batch(session: aiohttp.ClientSession, books: List[Book]) -> Dict[str, Any]:
+    """
+    Upsert books in batches using the DB_URL_UPSERT_BATCH endpoint.
+    
+    Each batch contains at most BATCH_SIZE books.
+    The endpoint accepts a list of books (each converted to a dictionary).
+    """
     db_status = {'processed': 0, 'errors': []}
     
-    # Process books in chunks to avoid overwhelming the database
+    # Partition books into batches of size BATCH_SIZE
+    batches = [books[i:i+BATCH_SIZE] for i in range(0, len(books), BATCH_SIZE)]
     semaphore = asyncio.Semaphore(CONCURRENT_DB_OPS)
     
-    async def upsert_with_semaphore(book):
+    async def upsert_batch(batch: List[Book]) -> Tuple[int, List[Dict]]:
+        # Convert each Book to a dictionary representation
+        payload = [json.loads(book.model_dump_json()) for book in batch]
         async with semaphore:
-            return await upsert_book(session, book)
+            try:
+                async with session.post(DB_URL_UPSERT_BATCH, json=payload) as response:
+                    if response.status != 200:
+                        error_text = await response.text()
+                        errors = [{'book_url': b.get('book_url', 'unknown'), 'error': error_text} for b in payload]
+                        return 0, errors
+                    else:
+                        return len(batch), []
+            except Exception as e:
+                errors = [
+                    {'book_url': json.loads(book.model_dump_json()).get('book_url', 'unknown'), 'error': str(e)} 
+                    for book in batch
+                ]
+                return 0, errors
     
-    tasks = [upsert_with_semaphore(book) for book in books]
+    tasks = [upsert_batch(batch) for batch in batches]
     results = await asyncio.gather(*tasks)
     
-    for result in results:
-        db_status['processed'] += result['processed']
-        if result.get('error'):
-            db_status['errors'].append(result['error'])
-    
+    for processed, errors in results:
+        db_status['processed'] += processed
+        db_status['errors'].extend(errors)
+        
     return db_status
 
 async def main() -> Dict:
@@ -93,9 +100,9 @@ async def main() -> Dict:
             # Process all books
             all_scraped_books, all_failed_books = await process_books_batch(session, book_urls, scraper)
             
-            # Upload to database concurrently
+            # Upload to database in batches concurrently
             if all_scraped_books:
-                db_result = await upsert_books_concurrent(session, all_scraped_books)
+                db_result = await upsert_books_batch(session, all_scraped_books)
                 db_status.update(db_result)
             
             logger.info(f"Processing completed. Processed {len(all_scraped_books)} books, {len(all_failed_books)} failed.")
